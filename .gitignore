@@ -25,6 +25,8 @@ devel_isolated/
 *.dox
 *.wikidoc
 
+*.deb
+
 # eclipse stuff
 .project
 .cproject

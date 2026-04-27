@@ -1,0 +1,24 @@
+[4.459s] Invoking command in '/home/marwan/AUC_SUMMIT_CUFE/src/processing_pkg': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/marwan/AUC_SUMMIT_CUFE/install/processing_pkg/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/processing_pkg build --build-base /home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/build install --record /home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/install.log --single-version-externally-managed install_data
+[5.785s] running egg_info
+[5.811s] writing ../../build/processing_pkg/processing_pkg.egg-info/PKG-INFO
+[5.812s] writing dependency_links to ../../build/processing_pkg/processing_pkg.egg-info/dependency_links.txt
+[5.813s] writing entry points to ../../build/processing_pkg/processing_pkg.egg-info/entry_points.txt
+[5.813s] writing requirements to ../../build/processing_pkg/processing_pkg.egg-info/requires.txt
+[5.813s] writing top-level names to ../../build/processing_pkg/processing_pkg.egg-info/top_level.txt
+[5.987s] reading manifest file '../../build/processing_pkg/processing_pkg.egg-info/SOURCES.txt'
+[5.989s] writing manifest file '../../build/processing_pkg/processing_pkg.egg-info/SOURCES.txt'
+[5.989s] running build
+[5.989s] running build_py
+[5.990s] copying processing_pkg/processing_node.py -> /home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/build/lib/processing_pkg
+[5.990s] running install
+[6.013s] running install_lib
+[6.136s] copying /home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/build/lib/processing_pkg/processing_node.py -> /home/marwan/AUC_SUMMIT_CUFE/install/processing_pkg/lib/python3.12/site-packages/processing_pkg
+[6.137s] byte-compiling /home/marwan/AUC_SUMMIT_CUFE/install/processing_pkg/lib/python3.12/site-packages/processing_pkg/processing_node.py to processing_node.cpython-312.pyc
+[6.139s] running install_data
+[6.139s] running install_egg_info
+[6.201s] removing '/home/marwan/AUC_SUMMIT_CUFE/install/processing_pkg/lib/python3.12/site-packages/processing_pkg-0.0.0-py3.12.egg-info' (and everything under it)
+[6.203s] Copying ../../build/processing_pkg/processing_pkg.egg-info to /home/marwan/AUC_SUMMIT_CUFE/install/processing_pkg/lib/python3.12/site-packages/processing_pkg-0.0.0-py3.12.egg-info
+[6.206s] running install_scripts
+[6.763s] Installing processing_node script to /home/marwan/AUC_SUMMIT_CUFE/install/processing_pkg/lib/processing_pkg
+[6.764s] writing list of installed files to '/home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/install.log'
+[6.893s] Invoked command in '/home/marwan/AUC_SUMMIT_CUFE/src/processing_pkg' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/marwan/AUC_SUMMIT_CUFE/install/processing_pkg/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/processing_pkg build --build-base /home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/build install --record /home/marwan/AUC_SUMMIT_CUFE/build/processing_pkg/install.log --single-version-externally-managed install_data

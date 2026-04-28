@@ -5,7 +5,7 @@ import numpy as np
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import Twist
 
-from trajectory_pkg.processing import generate_trajectory
+from Processing import generate_trajectory
 
 
 class ProcessingNode(Node):
@@ -15,14 +15,14 @@ class ProcessingNode(Node):
 
         self.subscription = self.create_subscription(
             Float32MultiArray,
-            '/input_points',
+            '/drawing_coords_raw',
             self.path_cb,
             10
         )
 
         self.publisher_ = self.create_publisher(
             Twist,
-            '/tool_velocity',
+            '/ros_pid_controller',
             10
         )
 

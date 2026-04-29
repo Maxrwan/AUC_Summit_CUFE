@@ -1,0 +1,3 @@
+<launch>
+    <node name="communication_tester" pkg="atom_pnp" type="communication_tester.py" output="screen"/>
+</launch>

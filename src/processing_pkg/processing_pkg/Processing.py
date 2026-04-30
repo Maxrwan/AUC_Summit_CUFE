@@ -51,7 +51,7 @@ def lower_z(z, target_z, dt):
 
     return z, vz_list, z_path
 
-def split_at_corners(line, angle_threshold_deg=20):
+def split_at_corners(line, angle_threshold_deg=30):
     pts = np.array(line)
     
     if len(pts) < 3:
@@ -92,15 +92,63 @@ def densify_line(p1, p2, num=50):
     y = np.linspace(p1[1], p2[1], num)
     return list(zip(x, y))
 
+def generate_test_shape(name):
+    pts = []
 
-points = []
+    if name == "H":
+        pts += densify_line((0,0), (0,6), 100)
+        pts += densify_line((4,0), (4,6), 100)
+        pts += densify_line((0,3), (4,3), 100)
 
-# vertical
-points += densify_line((0,0), (0,6), 100)
-# top
-points += densify_line((0,6), (4,6), 100)
-# middle
-points += densify_line((0,3), (3,3), 100)
+    elif name == "square":
+        pts += densify_line((0,0), (4,0), 100)
+        pts += densify_line((4,0), (4,4), 100)
+        pts += densify_line((4,4), (0,4), 100)
+        pts += densify_line((0,4), (0,0), 100)
+
+    elif name == "grid":
+        for i in range(5):
+            pts += densify_line((0,i), (4,i), 80)
+            pts += densify_line((i,0), (i,4), 80)
+
+    elif name == "triangle":
+        pts += densify_line((0,0), (4,0), 100)
+        pts += densify_line((4,0), (2,3), 100)
+        pts += densify_line((2,3), (0,0), 100)
+
+    elif name == "zigzag":
+        pts += densify_line((0,0), (1,2), 50)
+        pts += densify_line((1,2), (2,0), 50)
+        pts += densify_line((2,0), (3,2), 50)
+        pts += densify_line((3,2), (4,0), 50)
+
+    elif name == "parallel_lines":
+        for i in range(5):
+            pts += densify_line((0,i), (5,i), 100)
+
+    elif name == "cross":
+        pts += densify_line((0,2), (4,2), 100)
+        pts += densify_line((2,0), (2,4), 100)
+
+    elif name == "T":
+        pts += densify_line((2,0), (2,5), 100)
+        pts += densify_line((0,5), (4,5), 100)
+
+    elif name == "circle":
+        theta = np.linspace(0, 2*np.pi, 300)
+        r = 3
+        for t in theta:
+            pts.append((r*np.cos(t), r*np.sin(t)))
+
+    elif name == "spiral":
+        theta = np.linspace(0, 4*np.pi, 400)
+        for t in theta:
+            r = 0.2 * t
+            pts.append((r*np.cos(t), r*np.sin(t)))
+
+    return pts
+
+points = generate_test_shape("triangle")
 lines = get_ordered_splines(points, radius=1.5)
 
 plt.figure()
@@ -146,10 +194,6 @@ def is_straight_line(line, tol=1e-3):
             return False
 
     return True
-
-# for line in lines:
-#     x_points = [p[0] for p in line]
-#     y_points = [p[1] for p in line]
 
 def generate_spline(line):
     line = np.array(line)
@@ -267,7 +311,7 @@ while remaining:
     best_idx = None 
     best_spline = None 
     best_endpos = None
-    best_dist = np.inf
+    best_cost = np.inf
     
     for i, spline in enumerate(remaining):
         d_start = np.linalg.norm(current_pos - spline["start"])
@@ -291,11 +335,29 @@ while remaining:
             dist = d_end
             end_pos = chosen_spline["end"]
             
-        if dist < best_dist:
+        # base cost = distance
+        cost = dist
+
+        # 🔥 add direction penalty
+        if len(ordered_splines) > 0:
+            prev = ordered_splines[-1]
+
+            prev_dir = np.array([prev["dx"][-1], prev["dy"][-1]])
+            curr_dir = np.array([chosen_spline["dx"][0], chosen_spline["dy"][0]])
+
+            prev_dir /= (np.linalg.norm(prev_dir) + 1e-8)
+            curr_dir /= (np.linalg.norm(curr_dir) + 1e-8)
+
+            angle_penalty = 1 - np.dot(prev_dir, curr_dir)
+
+            cost += 0.5 * angle_penalty  # weight
+
+        # 🔥 choose best
+        if cost < best_cost:
             best_idx = i
             best_spline = chosen_spline
             best_endpos = end_pos
-            best_dist = dist
+            best_cost = cost
     
     ordered_splines.append(best_spline)
     current_pos = best_endpos
@@ -380,59 +442,66 @@ for i, spline in enumerate(ordered_splines):
         prev_end = ordered_splines[i-1]["end"]
         curr_start = spline["start"]
 
-        # Z - axis transition
-        z, vz_list, z_path = lift_z(z, Z_UP, dt)
-        
-        for vz, z_val in zip(vz_list, z_path):
-            vx_all.append(0)
-            vy_all.append(0)
-            vz_all.append(vz)
+        dist = np.linalg.norm(prev_end - curr_start)
+        if dist > 0.05:
+            # Z - axis transition
+            z, vz_list, z_path = lift_z(z, Z_UP, dt)
             
-            x_actual.append(x)
-            y_actual.append(y)
-            z_actual.append(z_val)
+            for vz, z_val in zip(vz_list, z_path):
+                vx_all.append(0)
+                vy_all.append(0)
+                vz_all.append(vz)
+                
+                x_actual.append(x)
+                y_actual.append(y)
+                z_actual.append(z_val)
 
-        transition = generate_transition(prev_end, curr_start)
+            transition = generate_transition(prev_end, curr_start)
 
-        profile = TrapezoidalProfile(L=transition["L"], vmax=1.0, a=0.5)
+            profile = TrapezoidalProfile(L=transition["L"], vmax=1.0, a=0.5)
 
-        for t in np.arange(0, profile.Tf, dt):
-            v, s_current = profile.get_state(t)
+            for t in np.arange(0, profile.Tf, dt):
+                v, s_current = profile.get_state(t)
 
-            idx = np.searchsorted(transition["s"], s_current)
-            idx = min(idx, len(transition["dx"]) - 1)
+                idx = np.searchsorted(transition["s"], s_current)
+                idx = np.clip(idx, 1, len(transition["dx"]) - 1)
+                
+                s0 = transition["s"][idx - 1]
+                s1 = transition["s"][idx]
+                
+                alpha = (s_current - s0) / (s1 - s0 + 1e-8)
+                
+                dx_s = (1 - alpha) * transition["dx"][idx] + alpha * transition["dx"][idx]
+                dy_s = (1 - alpha) * transition["dy"][idx] + alpha * transition["dy"][idx]
+                
+                norm = np.hypot(dx_s, dy_s) + 1e-8
+
+                vx = v * dx_s / norm
+                vy = v * dy_s / norm
+                vz = 0
+
+                vx_all.append(vx)
+                vy_all.append(vy)
+                vz_all.append(vz)
+                
+                x = transition["x"][idx]
+                y = transition["y"][idx]    
+
+                x_actual.append(x)
+                y_actual.append(y)
+                z_actual.append(z)
+
+            # Z - axis transition
+            z, vz_list, z_path = lower_z(z, 0, dt)
             
-            dx_s = transition["dx"][idx]
-            dy_s = transition["dy"][idx]
-            
-            norm = np.hypot(dx_s, dy_s) + 1e-8
-
-            vx = v * dx_s / norm
-            vy = v * dy_s / norm
-            vz = 0
-
-            vx_all.append(vx)
-            vy_all.append(vy)
-            vz_all.append(vz)
-            
-            x = transition["x"][idx]
-            y = transition["y"][idx]    
-
-            x_actual.append(x)
-            y_actual.append(y)
-            z_actual.append(z)
-
-        # Z - axis transition
-        z, vz_list, z_path = lower_z(z, 0, dt)
-        
-        for vz, z_val in zip(vz_list, z_path):
-            vx_all.append(0)
-            vy_all.append(0)
-            vz_all.append(vz)
-            
-            x_actual.append(x)
-            y_actual.append(y)
-            z_actual.append(z_val)
+            for vz, z_val in zip(vz_list, z_path):
+                vx_all.append(0)
+                vy_all.append(0)
+                vz_all.append(vz)
+                
+                x_actual.append(x)
+                y_actual.append(y)
+                z_actual.append(z_val)
 
 
     # NOW DRAW THE ACTUAL SPLINE
@@ -442,10 +511,15 @@ for i, spline in enumerate(ordered_splines):
         v, s_current = profile.get_state(t)
 
         idx = np.searchsorted(spline["s"], s_current)
-        idx = min(idx, len(spline["dx"]) - 1)
+        idx = np.clip(idx, 1,len(spline["dx"]) - 1)
 
-        dx_s = spline["dx"][idx]
-        dy_s = spline["dy"][idx]
+        s0 = spline["s"][idx - 1]
+        s1 = spline["s"][idx]
+        
+        alpha = (s_current - s0) / (s1 - s0 + 1e-8)
+        
+        dx_s = (1 - alpha) * spline["dx"][idx - 1] + alpha * spline["dx"][idx]
+        dy_s = (1 - alpha) * spline["dy"][idx - 1] + alpha * spline["dy"][idx]
 
         norm = np.hypot(dx_s, dy_s) + 1e-8
 
@@ -478,58 +552,6 @@ t_values = np.arange(len(v_total)) * dt
 # cumulative distance (integrating speed)
 s_total = np.cumsum(v_total * dt)
 
-# =================== Old Code ===================
-# vx_list = []
-# vy_list = []
-
-# for t in np.arange(0, profile.Tf, dt):
-#     v, s_current = profile.get_state(t)
-    
-#     idx = np.searchsorted(s, s_current)
-#     idx = min(idx, len(dx) - 1)
-    
-#     dx_s = dx[idx]
-#     dy_s = dy[idx]
-    
-#     norm = np.hypot(dx_s, dy_s) + 1e-8
-    
-#     vx = v * dx_s / norm 
-#     vy = v * dy_s / norm 
-    
-#     vx_list.append(vx)
-#     vy_list.append(vy)
-    
-# x_actual = [x_s[0]]
-# y_actual = [y_s[0]]
-
-# x = x_s[0]
-# y = y_s[0]
-
-# for vx, vy in zip(vx_list, vy_list):
-#     x += vx *dt
-#     y += vy *dt
-#     x_actual.append(x)
-#     y_actual.append(y)
-
-# =================== Plotting ===================
-
-# plt.figure()
-
-# for spline in ordered_splines:
-#     plt.plot(spline["x"], spline["y"], '--')
-    
-# # actual paths
-# plt.plot(x_actual, y_actual, 'r', label = 'Actual Path')
-
-# for i in range(len(ordered_splines)-1):
-#     p1 = ordered_splines[i]["end"]
-#     p2 = ordered_splines[i+1]["start"]
-#     plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'k--')
-    
-# plt.axis('equal')
-# plt.legend()
-# plt.title("Multi-Spline Drawing")
-# plt.show()
 
 x_actual = np.array(x_actual)
 y_actual = np.array(y_actual)
@@ -594,28 +616,6 @@ plt.title("Z Motion (Pen Up / Down)")
 plt.xlabel("Time (s)")
 plt.ylabel("Z Height")
 plt.show()
-     
-# =================== Plotting (Old)===================
-# fig, axs = plt.subplots(2, 1)
-# axs[0].plot(t_values, v_list)
-# axs[0].set_title('Velocity Profile')
-# axs[0].set_xlabel('Time (s)')
 
-# axs[1].plot(t_values, s_list)
-# axs[1].set_title('Distance Profile')
-# axs[1].set_xlabel('Distance (m)')
-
-# fig.subplots_adjust(hspace=0.5)
-
-# plt.figure()
-# plt.plot(x_s, y_s, '--', label = 'Desired Path')
-# plt.plot(x_actual, y_actual, label = 'Simulated')
-# plt.legend()
-# plt.axis('equal')
-# plt.title('Path Tracking Result')
-# plt.xlabel('X (m)')
-# plt.ylabel('Y (m)')
-
-# plt.show()
 
 

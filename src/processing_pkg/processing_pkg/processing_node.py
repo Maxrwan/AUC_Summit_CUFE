@@ -89,3 +89,91 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+    
+# ============= ROS 1 CODE ==================
+
+#!/usr/bin/env python3
+
+# import rospy
+# import numpy as np
+
+# from std_msgs.msg import Float32MultiArray
+# from geometry_msgs.msg import Twist
+
+# from Processing import generate_trajectory
+
+
+# class ProcessingNode:
+
+#     def __init__(self):
+
+#         rospy.init_node('processing_node')
+
+#         self.sub = rospy.Subscriber(
+#             '/drawing_coords_raw',
+#             Float32MultiArray,
+#             self.path_cb
+#         )
+
+#         self.pub = rospy.Publisher(
+#             '/ros_pid_controller',
+#             Twist,
+#             queue_size=10
+#         )
+
+#         self.timer = None
+
+#         self.vx_all = []
+#         self.vy_all = []
+#         self.vz_all = []
+#         self.index = 0
+#         self.dt = 0.1
+
+#         rospy.loginfo("Processing node ready")
+
+#     def path_cb(self, msg):
+
+#         pts = np.array(msg.data).reshape(-1, 2)
+
+#         if len(pts) < 2:
+#             rospy.logwarn("Not enough points")
+#             return
+
+#         rospy.loginfo(f"Received {len(pts)} points")
+
+#         vx_all, vy_all, vz_all, dt = generate_trajectory(pts)
+
+#         self.vx_all = vx_all
+#         self.vy_all = vy_all
+#         self.vz_all = vz_all
+#         self.dt = dt
+#         self.index = 0
+
+#         # stop old timer
+#         if self.timer is not None:
+#             self.timer.shutdown()
+
+#         self.timer = rospy.Timer(rospy.Duration(self.dt), self.publish_velocity)
+
+#     def publish_velocity(self, event):
+
+#         if self.index >= len(self.vx_all):
+#             rospy.loginfo("Trajectory finished")
+#             if self.timer:
+#                 self.timer.shutdown()
+#                 self.timer = None
+#             return
+
+#         msg = Twist()
+#         msg.linear.x = float(self.vx_all[self.index])
+#         msg.linear.y = float(self.vy_all[self.index])
+#         msg.linear.z = float(self.vz_all[self.index])
+
+#         self.pub.publish(msg)
+
+#         self.index += 1
+
+
+# if __name__ == '__main__':
+#     node = ProcessingNode()
+#     rospy.spin()

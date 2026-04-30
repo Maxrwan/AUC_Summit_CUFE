@@ -11,8 +11,13 @@ Date: 26/5/2026
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import splprep, splev
+from sorting import extract_ordered_lines
+
 
 # ===================== helper functions =====================
+
+def get_ordered_splines(points, radius = 1.01):
+    return extract_ordered_lines(points, radius)
 
 def lift_z(z, target_z, dt):
     vz_list = []
@@ -46,14 +51,67 @@ def lower_z(z, target_z, dt):
 
     return z, vz_list, z_path
 
+def split_at_corners(line, angle_threshold_deg=20):
+    pts = np.array(line)
+    
+    if len(pts) < 3:
+        return [line]
 
-# Example: multiple strokes (like drawing a square + triangle)
-lines = [
-    [(0,0), (1,0), (1,1), (0,1), (0,0)],     # closed square
-    [(2,0), (3,1), (4,0)],                   # open V shape
-    [(5,0), (5,1), (6,1), (6,0), (5,0)],     # another closed shape
-    [(7,0), (8,1), (9,1), (10,0)]            # open polyline
-]
+    segments = []
+    current_segment = [pts[0]]
+
+    for i in range(1, len(pts)-1):
+        p_prev = pts[i-1]
+        p_curr = pts[i]
+        p_next = pts[i+1]
+
+        v1 = p_curr - p_prev
+        v2 = p_next - p_curr
+
+        v1 = v1 / (np.linalg.norm(v1) + 1e-8)
+        v2 = v2 / (np.linalg.norm(v2) + 1e-8)
+
+        angle = np.arccos(np.clip(np.dot(v1, v2), -1, 1))
+        angle_deg = np.degrees(angle)
+
+        current_segment.append(p_curr)
+
+        if angle_deg > angle_threshold_deg:
+            segments.append(current_segment)
+            current_segment = [p_curr]
+
+    current_segment.append(pts[-1])
+    segments.append(current_segment)
+
+    return segments
+
+# ===================== INPUT SECTION =====================
+
+def densify_line(p1, p2, num=50):
+    x = np.linspace(p1[0], p2[0], num)
+    y = np.linspace(p1[1], p2[1], num)
+    return list(zip(x, y))
+
+
+points = []
+
+# vertical
+points += densify_line((0,0), (0,6), 100)
+# top
+points += densify_line((0,6), (4,6), 100)
+# middle
+points += densify_line((0,3), (3,3), 100)
+lines = get_ordered_splines(points, radius=1.5)
+
+plt.figure()
+
+for line in lines:
+    line = np.array(line)
+    plt.plot(line[:,0], line[:,1], '-o')
+
+plt.title("Extracted Lines (DEBUG)")
+plt.axis('equal')
+plt.show()
 
 # Defining the Z axis 
 Z_UP = 0.1
@@ -66,48 +124,55 @@ Z_SPEED = 0.01
 x_points = []
 y_points = []
 splines = []
-line = lines[0]
+
+# =================== Straight Line Check ===================
+def is_straight_line(line, tol=1e-3):
+    """
+    Check if points are approximately collinear
+    """
+    pts = np.array(line)
+    
+    if len(pts) < 3:
+        return True
+    
+    v = pts[-1] - pts[0]
+    v = v / (np.linalg.norm(v) + 1e-8)
+
+    for p in pts[1:-1]:
+        vp = p - pts[0]
+        vp = vp / (np.linalg.norm(vp) + 1e-8)
+
+        if abs(np.dot(v, vp)) < (1 - tol):
+            return False
+
+    return True
 
 # for line in lines:
 #     x_points = [p[0] for p in line]
 #     y_points = [p[1] for p in line]
 
 def generate_spline(line):
-    x_points = [p[0] for p in line]
-    y_points = [p[1] for p in line]
+    line = np.array(line)
 
-    # adapt k
-    m = len(line)
-    k = min(3, m - 1)
-    
-    tck , u = splprep([x_points, y_points], s = 0, k = k)
-    #splines.append(tck)
+    x = line[:,0]
+    y = line[:,1]
 
-    u_dense = np.linspace(0, 1, 1000)
+    dx = np.gradient(x)
+    dy = np.gradient(y)
 
-    x_s, y_s = splev(u_dense, tck)
-    dx, dy = splev(u_dense, tck, der = 1)
-
-    dx = np.array(dx)
-    dy = np.array(dy)
-    x_s = np.array(x_s)
-    y_s = np.array(y_s)
-    
-    du = u_dense[1] - u_dense[0]
-    ds = np.hypot(dx, dy) * du
-    
+    ds = np.hypot(dx, dy)
     s = np.cumsum(ds)
     L = s[-1]
-    
+
     return {
-        "x": x_s,
-        "y": y_s,
+        "x": x,
+        "y": y,
         "dx": dx,
         "dy": dy,
         "s": s,
         "L": L,
-        "start": np.array([x_s[0], y_s[0]]),
-        "end": np.array([x_s[-1], y_s[-1]])
+        "start": np.array([x[0], y[0]]),
+        "end": np.array([x[-1], y[-1]])
     }
 
 # =================== Direction Calculation ===================
@@ -158,8 +223,40 @@ def generate_transition(p1, p2):
     }
     
 # =================== Simple Ordering ===================
+def remove_duplicates(line):
+    cleaned = [line[0]]
+    for p in line[1:]:
+        if p != cleaned[-1]:
+            cleaned.append(p)
+    return cleaned
 
-splines = [generate_spline(line) for line in lines]
+def clean_line(line, tol=1e-6):
+    """
+    Remove duplicate / near-duplicate points
+    """
+    cleaned = [line[0]]
+    
+    for p in line[1:]:
+        if np.linalg.norm(np.array(p) - np.array(cleaned[-1])) > tol:
+            cleaned.append(p)
+    
+    return cleaned
+
+processed_lines = []
+
+for line in lines:
+    line = clean_line(line)
+    split_lines = split_at_corners(line)
+
+    for seg in split_lines:
+        if len(seg) >= 2:
+            processed_lines.append(seg)
+            
+splines = []
+
+for line in processed_lines:
+    spline = generate_spline(line)
+    splines.append(spline)
 
 ordered_splines = []
 current_pos = splines[0]["start"]
@@ -274,6 +371,7 @@ z = 0
 
 x_actual.append(x)
 y_actual.append(y)
+z_actual.append(z)
 
 for i, spline in enumerate(ordered_splines):
 
@@ -283,7 +381,7 @@ for i, spline in enumerate(ordered_splines):
         curr_start = spline["start"]
 
         # Z - axis transition
-        y, vz_list, z_path = lift_z(z, Z_UP, dt)
+        z, vz_list, z_path = lift_z(z, Z_UP, dt)
         
         for vz, z_val in zip(vz_list, z_path):
             vx_all.append(0)
@@ -317,15 +415,15 @@ for i, spline in enumerate(ordered_splines):
             vy_all.append(vy)
             vz_all.append(vz)
             
-            x += vx * dt
-            y += vy * dt
+            x = transition["x"][idx]
+            y = transition["y"][idx]    
 
             x_actual.append(x)
             y_actual.append(y)
             z_actual.append(z)
 
         # Z - axis transition
-        y, vz_list, z_path = lower_z(z, 0, dt)
+        z, vz_list, z_path = lower_z(z, 0, dt)
         
         for vz, z_val in zip(vz_list, z_path):
             vx_all.append(0)
@@ -359,8 +457,8 @@ for i, spline in enumerate(ordered_splines):
         vy_all.append(vy)
         vz_all.append(vz)
 
-        x += vx * dt
-        y += vy * dt
+        x = spline["x"][idx]
+        y = spline["y"][idx]
 
         x_actual.append(x)
         y_actual.append(y)
@@ -375,7 +473,7 @@ vy_all = np.array(vy_all)
 v_total = np.hypot(vx_all, vy_all)
 
 # time vector
-t_values = np.arange(0, len(v_total) * dt, dt)
+t_values = np.arange(len(v_total)) * dt
 
 # cumulative distance (integrating speed)
 s_total = np.cumsum(v_total * dt)
@@ -415,22 +513,51 @@ s_total = np.cumsum(v_total * dt)
 
 # =================== Plotting ===================
 
+# plt.figure()
+
+# for spline in ordered_splines:
+#     plt.plot(spline["x"], spline["y"], '--')
+    
+# # actual paths
+# plt.plot(x_actual, y_actual, 'r', label = 'Actual Path')
+
+# for i in range(len(ordered_splines)-1):
+#     p1 = ordered_splines[i]["end"]
+#     p2 = ordered_splines[i+1]["start"]
+#     plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'k--')
+    
+# plt.axis('equal')
+# plt.legend()
+# plt.title("Multi-Spline Drawing")
+# plt.show()
+
+x_actual = np.array(x_actual)
+y_actual = np.array(y_actual)
+z_actual = np.array(z_actual)
+
 plt.figure()
 
-for spline in ordered_splines:
-    plt.plot(spline["x"], spline["y"], '--')
-    
-# actual paths
-plt.plot(x_actual, y_actual, 'r', label = 'Actual Path')
+# Desired Path 
+for i, spline in enumerate(ordered_splines):
+    if i == 0:
+        plt.plot(spline["x"], spline["y"], 'k--', label='Desired Path')
+    else:
+        plt.plot(spline["x"], spline["y"], 'k--')
+        
+# Actual Path
+for i in range(len(x_actual)-1):
+    if z_actual[i] < 1e-4:
+        plt.plot(x_actual[i:i+2], y_actual[i:i+2], 'r')
+    else:
+        plt.plot(x_actual[i:i+2], y_actual[i:i+2], 'b--')
 
-for i in range(len(ordered_splines)-1):
-    p1 = ordered_splines[i]["end"]
-    p2 = ordered_splines[i+1]["start"]
-    plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'k--')
-    
+# Fix duplicate legend entries
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())
+
 plt.axis('equal')
-plt.legend()
-plt.title("Multi-Spline Drawing")
+plt.title("Desired vs Actual Path (Pen Up/Down)")
 plt.show()
 
 
@@ -459,7 +586,7 @@ fig.subplots_adjust(hspace=0.4)
 plt.show()
 
 z_actual = np.array(z_actual)
-t_values = np.arange(0, len(z_actual) * dt, dt)
+t_values = np.arange(len(z_actual)) * dt
 
 plt.figure()
 plt.plot(t_values, z_actual)
@@ -490,4 +617,5 @@ plt.show()
 # plt.ylabel('Y (m)')
 
 # plt.show()
+
 

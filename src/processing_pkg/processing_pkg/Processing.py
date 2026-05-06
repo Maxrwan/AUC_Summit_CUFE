@@ -7,8 +7,10 @@ import matplotlib.pyplot as plt
 
 from image_process.image_to_points import capture_from_camera
 
-# 🔥 TEMP: will replace later with real module
-def fake_line_extraction(img_path):
+# 🔥 FUTURE: replace with real pipeline
+def get_lines_from_image(img_path):
+    # TODO: replace with:
+    # sketch → skeleton → line extraction
     return [
         [(0, 0), (1, 1), (2, 2)],
         [(4, 4), (5, 5)]
@@ -22,16 +24,17 @@ img_path = capture_from_camera()
 if img_path is None:
     raise ValueError("Image capture failed")
 
-lines = fake_line_extraction(img_path)
+lines = get_lines_from_image(img_path)
+
+if len(lines) == 0:
+    raise ValueError("No lines extracted")
+
 print("DEBUG: lines:", len(lines))
 
 
 # ===================== ORDER LINES =====================
 
 def order_lines(lines):
-    if len(lines) == 0:
-        return []
-
     ordered = []
     current = np.array(lines[0][0])
     remaining = lines.copy()
@@ -58,27 +61,35 @@ def order_lines(lines):
 lines = order_lines(lines)
 
 
-# ===================== TRAJECTORY GENERATION =====================
+# ===================== TRAJECTORY SETTINGS =====================
 
 dt = 0.02
 speed_draw = 0.5
 speed_move = 1.0
 
 z_draw = 0.0
-z_lift = 1.0  # 🔥 pen up
+z_lift = 1.0
 
 x_actual, y_actual, z_actual = [], [], []
 vx_all, vy_all, vz_all = [], [], []
 
-def move_to_point(x, y, z, target_x, target_y, target_z, speed):
+
+# ===================== MOTION FUNCTION =====================
+
+def move_to_point(x, y, z, tx, ty, tz, speed):
+
+    dx = tx - x
+    dy = ty - y
+    dz = tz - z
+
+    dist = np.sqrt(dx**2 + dy**2 + dz**2)
+
+    if dist < 1e-6:
+        return [], x, y, z
+
+    steps = max(int(dist / (speed * dt)), 1)
+
     traj = []
-
-    dx = target_x - x
-    dy = target_y - y
-    dz = target_z - z
-
-    dist = np.sqrt(dx**2 + dy**2 + dz**2) + 1e-8
-    steps = int(dist / (speed * dt)) + 1
 
     for i in range(steps):
         alpha = (i + 1) / steps
@@ -100,14 +111,16 @@ def move_to_point(x, y, z, target_x, target_y, target_z, speed):
 
 # ===================== BUILD TRAJECTORY =====================
 
-# start at first point
+# start at first point (lifted)
 x, y = lines[0][0]
 z = z_lift
 
 for line in lines:
 
-    # 🔥 MOVE ABOVE start of line
-    traj, x, y, z = move_to_point(x, y, z, line[0][0], line[0][1], z_lift, speed_move)
+    start_x, start_y = line[0]
+
+    # MOVE ABOVE start
+    traj, x, y, z = move_to_point(x, y, z, start_x, start_y, z_lift, speed_move)
 
     for t in traj:
         x_actual.append(t[0])
@@ -117,7 +130,7 @@ for line in lines:
         vy_all.append(t[4])
         vz_all.append(t[5])
 
-    # 🔥 LOWER PEN
+    # LOWER PEN
     traj, x, y, z = move_to_point(x, y, z, x, y, z_draw, speed_move)
 
     for t in traj:
@@ -128,7 +141,7 @@ for line in lines:
         vy_all.append(t[4])
         vz_all.append(t[5])
 
-    # 🔥 DRAW LINE
+    # DRAW
     for pt in line:
         traj, x, y, z = move_to_point(x, y, z, pt[0], pt[1], z_draw, speed_draw)
 
@@ -140,7 +153,7 @@ for line in lines:
             vy_all.append(t[4])
             vz_all.append(t[5])
 
-    # 🔥 LIFT PEN
+    # LIFT PEN
     traj, x, y, z = move_to_point(x, y, z, x, y, z_lift, speed_move)
 
     for t in traj:

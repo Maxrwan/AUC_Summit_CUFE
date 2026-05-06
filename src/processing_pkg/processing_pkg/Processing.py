@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 import numpy as np
 import matplotlib.pyplot as plt
 
-from image_process.image_to_points import capture_from_camera
+from image_process.camera import capture_from_camera
 
 # 🔥 FUTURE: replace with real pipeline
 def get_lines_from_image(img_path):

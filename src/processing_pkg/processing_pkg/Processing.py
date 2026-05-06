@@ -7,15 +7,6 @@ import matplotlib.pyplot as plt
 
 from image_process.camera import capture_from_camera
 
-# 🔥 FUTURE: replace with real pipeline
-def get_lines_from_image(img_path):
-    # TODO: replace with:
-    # sketch → skeleton → line extraction
-    return [
-        [(0, 0), (1, 1), (2, 2)],
-        [(4, 4), (5, 5)]
-    ]
-
 
 # ===================== INPUT =====================
 
@@ -23,6 +14,15 @@ img_path = capture_from_camera()
 
 if img_path is None:
     raise ValueError("Image capture failed")
+
+
+# 🔥 TEMP placeholder
+def get_lines_from_image(img_path):
+    return [
+        [(0, 0), (1, 1), (2, 2)],
+        [(4, 4), (5, 5)]
+    ]
+
 
 lines = get_lines_from_image(img_path)
 
@@ -65,10 +65,8 @@ lines = order_lines(lines)
 
 dt = 0.02
 speed_draw = 0.5
-speed_move = 1.0
 
-z_draw = 0.0
-z_lift = 1.0
+z_draw = 0.0  # always drawing plane
 
 x_actual, y_actual, z_actual = [], [], []
 vx_all, vy_all, vz_all = [], [], []
@@ -111,37 +109,12 @@ def move_to_point(x, y, z, tx, ty, tz, speed):
 
 # ===================== BUILD TRAJECTORY =====================
 
-# start at first point (lifted)
+# 🔥 Start directly at first point on drawing plane
 x, y = lines[0][0]
-z = z_lift
+z = z_draw
 
 for line in lines:
 
-    start_x, start_y = line[0]
-
-    # MOVE ABOVE start
-    traj, x, y, z = move_to_point(x, y, z, start_x, start_y, z_lift, speed_move)
-
-    for t in traj:
-        x_actual.append(t[0])
-        y_actual.append(t[1])
-        z_actual.append(t[2])
-        vx_all.append(t[3])
-        vy_all.append(t[4])
-        vz_all.append(t[5])
-
-    # LOWER PEN
-    traj, x, y, z = move_to_point(x, y, z, x, y, z_draw, speed_move)
-
-    for t in traj:
-        x_actual.append(t[0])
-        y_actual.append(t[1])
-        z_actual.append(t[2])
-        vx_all.append(t[3])
-        vy_all.append(t[4])
-        vz_all.append(t[5])
-
-    # DRAW
     for pt in line:
         traj, x, y, z = move_to_point(x, y, z, pt[0], pt[1], z_draw, speed_draw)
 
@@ -152,17 +125,6 @@ for line in lines:
             vx_all.append(t[3])
             vy_all.append(t[4])
             vz_all.append(t[5])
-
-    # LIFT PEN
-    traj, x, y, z = move_to_point(x, y, z, x, y, z_lift, speed_move)
-
-    for t in traj:
-        x_actual.append(t[0])
-        y_actual.append(t[1])
-        z_actual.append(t[2])
-        vx_all.append(t[3])
-        vy_all.append(t[4])
-        vz_all.append(t[5])
 
 
 # ===================== SAVE =====================
@@ -186,5 +148,5 @@ print("✅ Saved:", output_file)
 plt.figure()
 plt.plot(x_actual, y_actual, 'r')
 plt.axis('equal')
-plt.title("Trajectory with Pen Up/Down")
+plt.title("Trajectory WITHOUT Pen Lift")
 plt.show()

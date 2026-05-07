@@ -1,30 +1,29 @@
 import cv2
 import numpy as np
 
-
-def generate_sketch(img_path):
-
-    img = cv2.imread(img_path)
+def generate_sketch(img):
 
     if img is None:
-        raise ValueError(f"Failed to read image: {img_path}")
+        raise ValueError("Invalid image input")
 
-    # resize for consistency
     img = cv2.resize(img, (320, 320))
 
-    # grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    # 🔥 better smoothing (preserves edges)
+    gray = cv2.bilateralFilter(gray, 9, 75, 75)
 
-    # edge detection
-    edges = cv2.Canny(blurred, 50, 150)
+    # 🔥 adaptive thresholds (CRUCIAL)
+    v = np.median(gray)
 
-    # invert → black lines on white background
-    sketch = 255 - edges
+    lower = int(np.clip(0.66 * v, 40, 80)) # 80
+    upper = int(np.clip(1.33 * v, 100, 160)) # 160 
 
-    # ensure binary
-    _, sketch = cv2.threshold(sketch, 127, 255, cv2.THRESH_BINARY)
+    edges = cv2.Canny(gray, lower, upper)
+    edges = cv2.threshold(edges, 50, 255, cv2.THRESH_BINARY)[1]
 
-    return sketch
+    # 🔥 clean noise but KEEP structure
+    kernel = np.ones((3,3), np.uint8)    
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    
+    return edges
